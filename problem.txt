@@ -1,0 +1,2 @@
+if create-drop it will run the jpadao
+if none, the  TestSPR2 will run 
