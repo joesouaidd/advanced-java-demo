@@ -7,8 +7,7 @@ import fr.epita.services.DatabaseConfig;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,93 +18,81 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 public class TestJUN1 {
 
     @BeforeEach
-    public void setUp() throws Exception {
-        System.out.println("Initializing H2 database instance and importing data from base.sql...");
+    public void setup() throws Exception {
+        System.out.println("Initializing database and executing base.sql...");
 
-        // Initialize the EntityManagerFactory for JPA-based interactions
+        // Initialize the EntityManagerFactory
+        // Here we have now an active connection to the H2 database (connection numbers
+        // = 1)
         DatabaseConfig.initializeEntityManagerFactory("test-persistence-unit");
+        // it will automatically create the database schema based on the entities
+        // because of the hibernate.hbm2ddl.auto property in the persistence.xml file
 
-        // Establish a JDBC connection to the H2 in-memory database
         try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "");
                 Statement statement = connection.createStatement()) {
 
-            // Read SQL commands from the base.sql file
-            try (BufferedReader reader = new BufferedReader(new FileReader("./src/main/resources/base.sql"))) {
+            // Here we have now an active connection to the H2 database (connection n. = 2)
+            // Drop tables if they exist
+            statement.execute("DROP TABLE IF EXISTS bookings CASCADE;");
+            statement.execute("DROP TABLE IF EXISTS facilities CASCADE;");
+            statement.execute("DROP TABLE IF EXISTS members CASCADE;");
+
+            // Load SQL from base.sql
+            try (BufferedReader reader = new BufferedReader(
+                    new FileReader("./src/main/resources/base.sql"))) {
                 StringBuilder sqlBuilder = new StringBuilder();
                 String line;
-
-                // Append each line of the file to build the full SQL script
                 while ((line = reader.readLine()) != null) {
                     sqlBuilder.append(line).append("\n");
                 }
-
-                // Execute the constructed SQL script to populate the database
                 String sql = sqlBuilder.toString();
                 statement.execute(sql);
                 System.out.println("SQL from base.sql executed successfully.");
             }
         }
-    }
 
-    @AfterEach
-    public void tearDown() {
-        // Close the EntityManagerFactory to release all associated resources
-        DatabaseConfig.closeEntityManagerFactory();
-        System.out.println("Database instance closed.");
+        // Check the number of active connections in the pool
+        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "");
+                Statement statement = connection.createStatement()) {
+
+            // Here we have now an active connection to the H2 database (connection n. = 2)
+            System.out.println("Checking active connections in the H2 pool...");
+            var resultSet = statement.executeQuery("SELECT COUNT(*) FROM INFORMATION_SCHEMA.SESSIONS");
+            if (resultSet.next()) {
+                int activeConnections = resultSet.getInt(1);
+                System.out.println("Active connections in the pool: " + activeConnections);
+            }
+        }
     }
 
     @Test
-    public void testFetchFacilities() {
-        // Retrieve the EntityManager for querying the database
-        EntityManager em = DatabaseConfig.getEntityManager();
-        System.out.println("Fetching facilities from the database...");
+    public void testFetchData() {
+        System.out.println("Starting TestJUN1 test...");
 
-        // Use JPQL to fetch all Facility entities
+        // Fetch data using JPA
+        EntityManager em = DatabaseConfig.getEntityManager();
+
+        // Fetch and assert facilities
         TypedQuery<Facility> facilityQuery = em.createQuery("SELECT f FROM Facility f", Facility.class);
         List<Facility> facilities = facilityQuery.getResultList();
+        System.out.println("Facilities fetched: " + facilities.size());
+        assertEquals(9, facilities.size(), "Expected 9 facilities in the database");
 
-        // Print each fetched Facility object to the console
-        facilities.forEach(System.out::println);
-
-        // Assert that the fetched Facility list size matches the expected value
-        Assertions.assertEquals(9, facilities.size(), "The number of facilities retrieved is incorrect.");
-    }
-
-    @Test
-    public void testFetchMembers() {
-        // Retrieve the EntityManager for querying the database
-        EntityManager em = DatabaseConfig.getEntityManager();
-        System.out.println("Fetching members from the database...");
-
-        // Use JPQL to fetch all Member entities
+        // Fetch and assert members
         TypedQuery<Member> memberQuery = em.createQuery("SELECT m FROM Member m", Member.class);
         List<Member> members = memberQuery.getResultList();
+        System.out.println("Members fetched: " + members.size());
+        assertEquals(30, members.size(), "Expected 30 members in the database");
 
-        // Print each fetched Member object to the console
-        members.forEach(System.out::println);
-
-        // Assert that the fetched Member list size matches the expected value
-        Assertions.assertEquals(30, members.size(), "The number of members retrieved is incorrect.");
-    }
-
-    @Test
-    public void testFetchBookings() {
-        // Retrieve the EntityManager for querying the database
-        EntityManager em = DatabaseConfig.getEntityManager();
-        System.out.println("Fetching bookings from the database...");
-
-        // Use JPQL to fetch all Booking entities
+        // Fetch and assert bookings
         TypedQuery<Booking> bookingQuery = em.createQuery("SELECT b FROM Booking b", Booking.class);
         List<Booking> bookings = bookingQuery.getResultList();
-
-        // Print each fetched Booking object to the console
-        bookings.forEach(System.out::println);
-
-        // Assert that the fetched Booking list size matches the expected value
-        // Replace 0 with the actual expected size of the bookings list
-        Assertions.assertEquals(0, bookings.size(), "The number of bookings retrieved is incorrect.");
+        System.out.println("Bookings fetched: " + bookings.size());
+        assertEquals(0, bookings.size(), "Expected 0 bookings in the database");
     }
 }

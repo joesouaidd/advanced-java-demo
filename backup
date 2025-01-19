@@ -1,0 +1,97 @@
+package fr.epita.tests;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+import fr.epita.config.AppConfig;
+
+import javax.sql.DataSource;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+
+public class TestSPR2 {
+
+    /**
+     * TestSPR2: A test class to validate the H2 in-memory database integration with
+     * Spring.
+     *
+     * - Uses a Spring `DataSource` bean to manage the H2 in-memory database
+     * connection.
+     * - The database schema and initial data are loaded using the `base.sql` file
+     * through the `DataSource` bean.
+     * - The test queries the database to count the number of members and asserts
+     * the count against the expected value (30).
+     * - The `DataSource` bean ensures that the database schema is preserved for the
+     * duration of the test.
+     * - This test relies on Spring's dependency injection and context
+     * initialization to manage the database lifecycle.
+     * - It does not perform additional table drop operations manually as the
+     * `DataSource` bean ensures schema initialization using `base.sql`.
+     */
+
+    @Test
+    public void testMemberCount() throws Exception {
+        // Initialize Spring Application Context
+        ApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+
+        // Retrieve the DataSource bean
+        DataSource dataSource = context.getBean(DataSource.class);
+
+        // Load data from base.sql into the database
+        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "");
+                Statement statement = connection.createStatement()) {
+
+            // Drop tables if they exist
+            statement.execute("DROP TABLE IF EXISTS bookings CASCADE;");
+            statement.execute("DROP TABLE IF EXISTS facilities CASCADE;");
+            statement.execute("DROP TABLE IF EXISTS members CASCADE;");
+
+            // Read SQL from base.sql and execute it
+            try (BufferedReader reader = new BufferedReader(
+                    new FileReader("../core-module/src/main/resources/base.sql"))) {
+                StringBuilder sqlBuilder = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sqlBuilder.append(line).append("\n");
+                }
+                String sql = sqlBuilder.toString();
+                statement.execute(sql);
+                System.out.println("SQL data loaded from base.sql successfully.");
+            }
+        }
+
+        // the try block finished here.
+        // the tables don't drop after the try block because of the lifetime of the H2
+        // database instance and the nature of the connection pool used by Hibernate.
+
+        // the database stays active as long as at least one connection remains open
+        // Since Hibernate (via the EntityManagerFactory) keeps a pool of active
+        // connections, the database is not dropped when the try block finishes.
+
+        // In TestSPR2, because you’re not using Hibernate's EntityManager or
+        // interacting
+        // with the EntityManagerFactory, the schema lifecycle (create-drop) is not
+        // triggered for the tables.
+
+        // Query the database to count the members
+        int memberCount;
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement();
+                ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) AS total FROM members")) {
+            resultSet.next();
+            memberCount = resultSet.getInt("total");
+        }
+
+        // Display the count of members
+        System.out.println("Member count in database: " + memberCount);
+
+        // Assert that the member count is as expected (30 based on base.sql)
+        Assertions.assertEquals(30, memberCount, "The member count in the database is incorrect.");
+    }
+}

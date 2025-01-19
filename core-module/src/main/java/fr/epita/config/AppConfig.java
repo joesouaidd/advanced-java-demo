@@ -15,6 +15,8 @@ import java.sql.Statement;
 
 import org.h2.jdbcx.JdbcDataSource;
 
+//file is specific to Spring. It acts as a Spring configuration class
+
 @Configuration
 public class AppConfig {
 
