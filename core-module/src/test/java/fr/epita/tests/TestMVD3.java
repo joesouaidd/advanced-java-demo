@@ -29,7 +29,7 @@ public class TestMVD3 {
             executeSQLFromFile(connection, "./core-module/src/main/resources/create-bookings.sql");
             executeSQLFromFile(connection, "./core-module/src/main/resources/insert-members.sql");
             executeSQLFromFile(connection, "./core-module/src/main/resources/insert-facilities.sql");
-            executeSQLFromFile(connection, "./core-module/src/main/resourcest/insert-bookings.sql");
+            executeSQLFromFile(connection, "./core-module/src/main/resources/insert-bookings.sql");
 
             // Fetch and display data from the database
             List<Member> members = getMembers(connection);

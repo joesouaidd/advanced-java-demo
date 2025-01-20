@@ -8,8 +8,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import javax.sql.DataSource;
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -28,42 +26,6 @@ public class TestSPR2 {
         // Retrieve the DataSource bean from Spring context
         dataSource = context.getBean(DataSource.class);
 
-        // Drop and recreate the schema
-        try (Connection connection = dataSource.getConnection();
-                Statement statement = connection.createStatement()) {
-
-            statement.execute("DROP TABLE IF EXISTS bookings CASCADE;");
-            statement.execute("DROP TABLE IF EXISTS facilities CASCADE;");
-            statement.execute("DROP TABLE IF EXISTS members CASCADE;");
-
-            System.out.println("Current working directory: " + System.getProperty("user.dir"));
-
-            // Load SQL files
-            loadSQLFile(statement, "./src/main/resources/create-members.sql");
-            loadSQLFile(statement, "./src/main/resources/create-facilities.sql");
-            loadSQLFile(statement, "./src/main/resources/create-bookings.sql");
-            loadSQLFile(statement, "./src/main/resources/insert-members.sql");
-            loadSQLFile(statement, "./src/main/resources/insert-facilities.sql");
-            loadSQLFile(statement, "./src/main/resources/insert-bookings.sql");
-
-            connection.commit();
-
-            System.out.println("SQL data loaded successfully.");
-        }
-    }
-
-    private void loadSQLFile(Statement statement, String filePath) throws Exception {
-        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
-            StringBuilder sqlBuilder = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sqlBuilder.append(line).append("\n");
-            }
-
-            String sql = sqlBuilder.toString();
-            statement.execute(sql);
-            System.out.println("Loaded SQL from: " + filePath);
-        }
     }
 
     @Test
