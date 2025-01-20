@@ -1,4 +1,4 @@
 -uses Hibernate's JPA capabilities and entity mappings to perform database operations (MVD3)
 -uses spring dataSource bean (SPR2)
 
-//we easer use JPA or Spring bean for datasource for managing connections
+System.out.println("Current working directory: " + System.getProperty("user.dir"));

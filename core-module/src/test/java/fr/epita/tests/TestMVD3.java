@@ -1,132 +1,149 @@
 package fr.epita.tests;
 
+import fr.epita.datamodels.Booking;
 import fr.epita.datamodels.Facility;
 import fr.epita.datamodels.Member;
-import fr.epita.datamodels.Booking;
-import fr.epita.services.DatabaseConfig;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.Statement;
+import java.io.IOException;
+import java.sql.*;
+import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.TypedQuery;
+//This type of database communication is called JDBC (Java Database Connectivity). It is a low-level API provided by Java to directly interact with a relational database using SQL queries.
 
 public class TestMVD3 {
-
-    /**
-     * MVD3: A standalone test class to validate the manual initialization and
-     * querying of an H2 in-memory database.
-     *
-     * - Initializes the H2 in-memory database manually using JDBC (Java Database
-     * Connectivity) within a `try-with-resources` block.
-     * 
-     * - Reads and executes the `base.sql` file manually to initialize the database
-     * schema and populate initial data.
-     * 
-     * - Uses Hibernate's `EntityManager` for querying data from the database.
-     * 
-     * - Fetches and prints facilities, members, and bookings data to validate
-     * successful database initialization.
-     * 
-     * - The persistence configuration is set to `create-drop`, meaning the database
-     * schema is dropped after the session ends.
-     * 
-     * - This test highlights manual database setup and interaction without relying
-     * on a Spring-managed `DataSource` bean.
-     * 
-     * JDBC provides a uniform interface for accessing various databases (e.g.,
-     * MySQL, PostgreSQL, Oracle, etc.) using SQL without worrying about the
-     * specific database implementation.
-     * 
-     * 
-     * Components:
-     * 
-     * *DriverManager: Manages database drivers and establishes databaseconnections.
-     * *Connection: Represents the connection to a specific database.
-     * *Statement: Used to execute SQL queries or updates.
-     * *ResultSet: Stores the data retrieved from a database query.
-     * 
-     * Workflow:
-     * 
-     * *Load a database driver.
-     * *Establish a connection to the database.
-     * *Execute SQL statements using Statement or PreparedStatement.
-     * *Process the results using ResultSet.
-     * *Close the connection to free resources.
-     * 
-     */
+    private static final String JDBC_URL = "jdbc:h2:mem:testdb"; // In-memory H2 DB
+    private static final String JDBC_USER = "sa";
+    private static final String JDBC_PASSWORD = "";
 
     public static void main(String[] args) {
-        System.out.println("Initializing H2 database instance and importing data from base.sql...");
+        try (Connection connection = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASSWORD)) {
 
-        // just to see the current working directory
-        System.out.println("Current working directory: " + System.getProperty("user.dir"));
+            System.out.println("Current working directory: " + System.getProperty("user.dir"));
 
-        // Step 1: Initialize the H2 database and connect to it using JDBC
+            // Load and execute SQL scripts
+            executeSQLFromFile(connection, "./core-module/src/main/resources/create-members.sql");
+            executeSQLFromFile(connection, "./core-module/src/main/resources/create-facilities.sql");
+            executeSQLFromFile(connection, "./core-module/src/main/resources/create-bookings.sql");
+            executeSQLFromFile(connection, "./core-module/src/main/resources/insert-members.sql");
+            executeSQLFromFile(connection, "./core-module/src/main/resources/insert-facilities.sql");
+            executeSQLFromFile(connection, "./core-module/src/main/resourcest/insert-bookings.sql");
 
-        // loads the JDBC driver
-        DatabaseConfig.initializeEntityManagerFactory("test-persistence-unit");
+            // Fetch and display data from the database
+            List<Member> members = getMembers(connection);
+            List<Facility> facilities = getFacilities(connection);
+            List<Booking> bookings = getBookings(connection, members, facilities);
 
-        // Establish a JDBC connection to the H2 in-memory database
-        // the checking of the number has been made inside of the try block because the
-        // connection is closed after the try block and the data is not available after
-        // that
-        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "");
+            System.out.println("Members:");
+            members.forEach(System.out::println);
+
+            System.out.println("\nFacilities:");
+            facilities.forEach(System.out::println);
+
+            System.out.println("\nBookings:");
+            bookings.forEach(System.out::println);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void executeSQLFromFile(Connection connection, String filePath) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath));
                 Statement statement = connection.createStatement()) {
 
-            // Drop tables if they exist because the test-persistence-unit usually create
-            // the table schema because the persistence.xml file has the property
-            // hibernate.hbm2ddl.auto set to create-drop
-            statement.execute("DROP TABLE IF EXISTS bookings CASCADE");
-            statement.execute("DROP TABLE IF EXISTS facilities CASCADE");
-            statement.execute("DROP TABLE IF EXISTS members CASCADE");
-
-            // Step 2: Read SQL commands from the base.sql file and execute them
-            try (BufferedReader reader = new BufferedReader(
-                    new FileReader("./core-module/src/main/resources/base.sql"))) {
-                StringBuilder sqlBuilder = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sqlBuilder.append(line).append("\n");
-                }
-                String sql = sqlBuilder.toString(); // The complete SQL script
-                statement.execute(sql); // Execute the SQL script
-                System.out.println("SQL from base.sql executed successfully.");
+            StringBuilder sql = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sql.append(line).append(" ");
             }
 
-            // Step 3: Create the EntityManager for querying data from the database
-            // em is in the hibernate namespace
-            EntityManager em = DatabaseConfig.getEntityManager();
-
-            // Step 4: Fetch and display all facilities
-            System.out.println("Fetching facilities from the database...");
-            TypedQuery<Facility> facilityQuery = em.createQuery("SELECT f FROM Facility f", Facility.class);
-            List<Facility> facilities = facilityQuery.getResultList();
-            facilities.forEach(System.out::println); // Print each facility object
-
-            // Step 5: Fetch and display all members
-            System.out.println("Fetching members from the database...");
-            TypedQuery<Member> memberQuery = em.createQuery("SELECT m FROM Member m", Member.class);
-            List<Member> members = memberQuery.getResultList();
-            members.forEach(System.out::println); // Print each member object
-
-            // Step 6: Fetch and display all bookings
-            System.out.println("Fetching bookings from the database...");
-            TypedQuery<Booking> bookingQuery = em.createQuery("SELECT b FROM Booking b", Booking.class);
-            List<Booking> bookings = bookingQuery.getResultList();
-            bookings.forEach(System.out::println); // Print each booking object
-
-        } catch (Exception e) {
-            // Print the stack trace in case of any errors during execution
+            statement.execute(sql.toString());
+            System.out.println("Executed: " + filePath);
+        } catch (IOException | SQLException e) {
             e.printStackTrace();
-        } finally {
-            // Step 7: Close the EntityManagerFactory to release resources
-            DatabaseConfig.closeEntityManagerFactory();
-            System.out.println("TestMVD3 execution completed.");
         }
+    }
+
+    private static List<Member> getMembers(Connection connection) {
+        List<Member> members = new ArrayList<>();
+        String query = "SELECT * FROM members";
+
+        try (Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                Member member = new Member();
+                member.setMemid(rs.getInt("memid"));
+                member.setSurname(rs.getString("surname"));
+                member.setFirstname(rs.getString("firstname"));
+                member.setAddress(rs.getString("address"));
+                member.setZipcode(rs.getInt("zipcode"));
+                member.setTelephone(rs.getString("telephone"));
+                member.setRecommendedBy(rs.getObject("recommendedby") != null ? rs.getInt("recommendedby") : null);
+                member.setJoinDate(rs.getTimestamp("joindate"));
+
+                members.add(member);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return members;
+    }
+
+    private static List<Facility> getFacilities(Connection connection) {
+        List<Facility> facilities = new ArrayList<>();
+        String query = "SELECT * FROM facilities";
+
+        try (Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                Facility facility = new Facility();
+                facility.setFacid(rs.getInt("facid"));
+                facility.setName(rs.getString("name"));
+                facility.setMemberCost(rs.getBigDecimal("membercost"));
+                facility.setGuestCost(rs.getBigDecimal("guestcost"));
+                facility.setInitialOutlay(rs.getBigDecimal("initialoutlay"));
+                facility.setMonthlyMaintenance(rs.getBigDecimal("monthlymaintenance"));
+
+                facilities.add(facility);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return facilities;
+    }
+
+    private static List<Booking> getBookings(Connection connection, List<Member> members, List<Facility> facilities) {
+        List<Booking> bookings = new ArrayList<>();
+        String query = "SELECT * FROM bookings";
+
+        try (Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                Booking booking = new Booking();
+                booking.setBookid(rs.getInt("bookid"));
+                booking.setStartTime(rs.getTimestamp("starttime"));
+                booking.setSlots(rs.getInt("slots"));
+
+                // Map member and facility using IDs
+                int memId = rs.getInt("memid");
+                int facId = rs.getInt("facid");
+
+                Member member = members.stream().filter(m -> m.getMemid() == memId).findFirst().orElse(null);
+                Facility facility = facilities.stream().filter(f -> f.getFacid() == facId).findFirst().orElse(null);
+
+                booking.setMember(member);
+                booking.setFacility(facility);
+
+                bookings.add(booking);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return bookings;
     }
 }

@@ -27,7 +27,8 @@ public class Booking {
     private int slots;
 
     // Constructors
-    public Booking() {}
+    public Booking() {
+    }
 
     public Booking(Facility facility, Member member, Timestamp startTime, int slots) {
         this.facility = facility;

@@ -12,10 +12,9 @@ import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.Properties;
 
 import org.h2.jdbcx.JdbcDataSource;
-
-//file is specific to Spring. It acts as a Spring configuration class
 
 @Configuration
 public class AppConfig {
@@ -31,18 +30,35 @@ public class AppConfig {
     public DataSource dataSource() throws Exception {
         System.out.println("Initializing H2 DataSource and loading SQL data...");
 
+        System.out.println("Current working directory: " + System.getProperty("user.dir"));
+
         // Create H2 DataSource
         JdbcDataSource dataSource = new JdbcDataSource();
         dataSource.setURL("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1");
         dataSource.setUser("sa");
         dataSource.setPassword("");
 
-        // Load SQL file
+        // Load SQL files
         try (Connection connection = dataSource.getConnection();
-                Statement statement = connection.createStatement();
-                BufferedReader reader = new BufferedReader(new FileReader(
-                        "C:/Users/User/Desktop/Adv-Java-SampleExam/core-module/src/main/resources/base.sql"))) {
+                Statement statement = connection.createStatement()) {
 
+            loadSQLFile(statement, "./src/main/resources/create-members.sql");
+            loadSQLFile(statement, "./src/main/resources/create-facilities.sql");
+            loadSQLFile(statement, "./src/main/resources/create-bookings.sql");
+            loadSQLFile(statement, "./src/main/resources/insert-members.sql");
+            loadSQLFile(statement, "./src/main/resources/insert-facilities.sql");
+            loadSQLFile(statement, "./src/main/resources/insert-bookings.sql");
+
+            connection.commit();
+
+            System.out.println("SQL data loaded successfully.");
+        }
+
+        return dataSource;
+    }
+
+    private void loadSQLFile(Statement statement, String filePath) throws Exception {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             StringBuilder sqlBuilder = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
@@ -51,18 +67,26 @@ public class AppConfig {
 
             String sql = sqlBuilder.toString();
             statement.execute(sql);
-            connection.commit();
-
-            System.out.println("SQL data from base.sql loaded successfully.");
+            System.out.println("Loaded SQL from: " + filePath);
         }
-
-        return dataSource;
     }
 
     // Define a bean for EntityManagerFactory
     @Bean
     public EntityManagerFactory entityManagerFactory() {
         System.out.println("Initializing EntityManagerFactory...");
-        return Persistence.createEntityManagerFactory("test-persistence-unit");
+        Properties properties = new Properties();
+        properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+        properties.put("hibernate.hbm2ddl.auto", "none"); // Do not recreate schema
+        properties.put("hibernate.show_sql", "true");
+        properties.put("hibernate.format_sql", "true");
+
+        return Persistence.createEntityManagerFactory("test-persistence-unit", properties);
     }
+
+    // @Bean
+    // public EntityManagerFactory entityManagerFactory() {
+    // System.out.println("Initializing EntityManagerFactory...");
+    // return Persistence.createEntityManagerFactory("test-persistence-unit");
+    // }
 }
